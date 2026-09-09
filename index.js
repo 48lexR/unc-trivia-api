@@ -14,13 +14,15 @@ app.use(express.json());
 const pool = new Pool(conf);
 // const client = await pool.connect();
 
-
+// GET endpoint
+// Accepts query parameters index, topic, and difficulty
 app.get('/api/questions', async (req, res) => {
 	const { index, topic, difficulty } = req.query;
+	console.log(`Accepted conection: ${req.method} from ${req.originalUrl}`);
 	let params = []
 	const client = await pool.connect();
 	try{	
-		let queryText = 'GET * FROM questions WHERE 1=1';
+		let queryText = 'SELECT * FROM questions WHERE 1=1';
 		if (index) {
 			params.push(parseInt(index));
 			queryText += ` AND index=$${params.length}`;
@@ -32,24 +34,47 @@ app.get('/api/questions', async (req, res) => {
 		}
 
 		if(difficulty) {
-			params.push(difficulty);
+			params.push(parseInt(difficulty));
 			queryText += ` AND difficulty=$${params.length}`;
 		}
 
-		const rows = await client.query(queryText, params);
-		if(res.rows.length === 0){
+		const data = await client.query(queryText, params);
+		if(data.rows.length === 0){
 			res.status(404).json({ error: "No such question matches those parameters" });
 		} else {
-			res.json(result.rows);
+			res.json(data.rows);
 		}
-	} catch (e) {
-		await client.query('ROLLBACK');
-		res.status(500);
+	} catch (e) {	
+		res.status(500).json({ error: "Internal server error" });
 	} finally {
 		client.release();
 	}
 });
 
+// POST endpoint
+// creates a new question
+
+app.post('/api/questions', async (req, res) => {
+	const client = await pool.connect();
+	const { content, answer, topic, difficulty } = req.body;
+	console.log(`Accepted conection: ${req.method} from ${req.originalUrl}`);
+	try {
+		if(!content || !answer || !topic || difficulty === undefined){
+			res.status(400).json({ error: "Missing fields in POST body." });
+		}
+		let queryText = `
+		INSERT INTO questions (content, answer, topic, difficulty)
+		VALUES ($1, $2, $3, $4)
+		RETURNING *`;
+
+		const queryRes = await client.query(queryText, [content, answer, topic, parseInt(difficulty)]);
+		res.status(201).json(queryRes.rows[0]);
+	} catch (e) {
+		res.status(500).json({ error: `${e.name}: ${e.message}`});
+	} finally {
+		client.release();
+	}
+});
 
 app.listen(parseInt(process.env.API_PORT), async () => {
 	let res = await pool.query(`CREATE TABLE IF NOT EXISTS questions(
