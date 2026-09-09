@@ -1,6 +1,6 @@
 {
   "name": "unc-trivia-api",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "UNC trivia api (in expressjs)",
   "author": "micbul",
   "type": "module",
