@@ -1,6 +1,6 @@
 {
   "name": "unc-trivia-api",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "UNC trivia api (in expressjs)",
   "author": "micbul",
   "type": "module",
@@ -10,7 +10,10 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
+    "argon2": "^0.45.1",
+    "cookie-parser": "^1.4.7",
     "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
     "pg": "^8.23.0"
   }
 }
