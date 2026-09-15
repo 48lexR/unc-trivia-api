@@ -32,6 +32,10 @@ const requireAuth = (req, res, next) => {
 	}
 };
 
+app.get('/api/whoami', requireAuth, async (req, res) => {
+	res.json({ user: req.user.username });
+});
+
 /**
  * LOGIN ENDPOINTS
  */ 
@@ -70,6 +74,15 @@ app.post('/api/login', async (req, res) => {
 	} finally {
 		client.release();
 	}
+});
+
+app.post('/api/logout', async (req, res) => {
+    res.clearCookie('token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax'
+    });
+    return res.status(200).json({ ok: 'true' });
 });
 
 /**
@@ -219,7 +232,7 @@ app.get('/api/questions', async (req, res) => {
 app.post('/api/questions', requireAuth, async (req, res) => {
 	// TODO: Need a more secure way to verify user id
 	const client = await pool.connect();
-	const { content, answer, topic, difficulty, user_id } = req.body;
+	const { content, answer, topic, difficulty } = req.body;
 	console.log(`Accepted conection: ${req.method} from ${req.originalUrl}`);
 	try {
 		if(!content || !answer || !topic || difficulty === undefined){
@@ -293,6 +306,47 @@ app.delete('/api/questions', requireAuth, async (req, res) => {
 	}
 });
 
+
+/**
+ * RANDOM QUESTION ENDPOINT
+ */  
+
+app.get('/api/questions/random', async (req, res) => {
+	const client = await pool.connect();
+	const { topic, user_id, difficulty } = req.query;
+	let params = [];
+	try {
+		let queryString = `SELECT * FROM questions WHERE 1=1 `;
+
+		if(topic){
+			params.push(topic);
+			queryString += `AND topic=$${params.length} `;
+		}
+	
+		if(difficulty){
+			params.push(difficulty);
+			queryString += `AND difficulty=$${params.length} `;
+		}
+
+		if(user_id){
+			params.push(user_id);
+			queryString += `AND user_id=$${params.length} `;
+		}
+
+		queryString += `ORDER BY RANDOM() LIMIT 1`;
+
+		const data = await client.query(queryString, params);
+
+		if(data.rows.length === 0){
+			return res.status(404).json({ error: "not found." });
+		}
+		return res.json(data.rows[0]);
+	} catch (e) {
+		return res.status(500).json({ error: "Internal server error" });
+	} finally {
+		client.release();
+	}
+});
 
 /**
  * App starting point
