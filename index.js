@@ -3,6 +3,7 @@ import { Client, Pool } from 'pg';
 import jwt from 'jsonwebtoken';
 import argon2 from 'argon2';
 import cookieParser from 'cookie-parser';
+import { body, validationResult } from 'express-validator';
 
 const conf = {
 	user: process.env.POSTGRES_USER,
@@ -229,33 +230,43 @@ app.get('/api/questions', async (req, res) => {
 // POST endpoint
 // creates a new question
 
-app.post('/api/questions', requireAuth, async (req, res) => {
-	// TODO: Need a more secure way to verify user id
-	const client = await pool.connect();
-	const { content, answer, topic, difficulty } = req.body;
-	console.log(`Accepted conection: ${req.method} from ${req.originalUrl}`);
-	try {
-		if(!content || !answer || !topic || difficulty === undefined){
-			return res.status(400).json({ error: "I don't understand that." });
-		}
-		let queryText = `
-		INSERT INTO questions (content, answer, topic, difficulty, user_id)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING *`;
+app.post('/api/questions',
+         requireAuth,
+         body('content').trim().escape().isLength({ max: 255 }),
+         body('answer').trim().escape().isLength({ max: 255 }),
+         body('topic').trim().escape().isLength({ max: 255 }),
+         body('difficulty').trim().escape().isLength({ max: 255 }),
+         async (req, res) => {
+            const client = await pool.connect();
+            const { content, answer, topic, difficulty } = req.body;
+            console.log(`Accepted conection: ${req.method} from ${req.originalUrl}`);
+            try {
+                if(!content || !answer || !topic || difficulty === undefined){
+                    return res.status(400).json({ error: "I don't understand that." });
+                }
+                let queryText = `
+                INSERT INTO questions (content, answer, topic, difficulty, user_id)
+                VALUES ($1, $2, $3, $4, $5)
+                RETURNING *`;
 
-		const queryRes = await client.query(queryText, [content, answer, topic, parseInt(difficulty), req.user.id]);
-		return res.status(201).json(queryRes.rows[0]);
-	} catch (e) {
-		if(e.code === "23505"){
-			return res.status(409).json({ error: "Duplicate question?" });
-		}
-		return res.status(500).json({ error: `${e.name}: ${e.message}`});
-	} finally {
-		client.release();
-	}
+                const queryRes = await client.query(queryText, [content, answer, topic, parseInt(difficulty), req.user.id]);
+                return res.status(201).json(queryRes.rows[0]);
+            } catch (e) {
+                if(e.code === "23505"){
+                    return res.status(409).json({ error: "Duplicate question?" });
+                }
+                return res.status(500).json({ error: `${e.name}: ${e.message}`});
+            } finally {
+                client.release();
+            }
 });
 
-app.put('/api/questions', requireAuth, async (req, res) => {
+app.put('/api/questions', requireAuth,
+        body('content').trim().escape().isLength({ max: 255 }),
+         body('answer').trim().escape().isLength({ max: 255 }),
+         body('topic').trim().escape().isLength({ max: 255 }),
+        body('difficulty').trim().escape().isLength({ max: 255 }),
+        async (req, res) => {
 	// TODO: Need a more secure way to verify user ID
 	const { index, content, answer, topic, difficulty } = req.body;
 	const client = await pool.connect();
